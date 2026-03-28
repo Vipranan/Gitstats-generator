@@ -143,12 +143,21 @@ const MOCK = {
 // ── API Functions ─────────────────────────────────────────────────────
 
 async function fetchWithFallback(endpoint, mockKey, params = {}) {
-  try {
-    const res = await client.get(endpoint, { params });
-    return res.data;
-  } catch {
-    console.warn(`API unavailable for ${endpoint}, using mock data`);
-    return MOCK[mockKey];
+  // Retry once on network/timeout errors (handles Render cold starts)
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await client.get(endpoint, { params });
+      return res.data;
+    } catch (err) {
+      const isRetryable = !err.response || err.code === "ECONNABORTED";
+      if (isRetryable && attempt === 0) {
+        console.warn(`Retrying ${endpoint} after cold start...`);
+        await new Promise((r) => setTimeout(r, 3000));
+        continue;
+      }
+      console.warn(`API unavailable for ${endpoint}, using mock data`);
+      return MOCK[mockKey];
+    }
   }
 }
 
@@ -186,6 +195,26 @@ export async function fetchRepos() {
 }
 
 export async function loadRepo(repoFullName) {
-  const res = await client.post("/repo/load", { repo: repoFullName });
-  return res.data;
+  // Kick off background loading
+  await client.post("/repo/load", { repo: repoFullName });
+
+  // Poll until loading finishes
+  const maxWait = 120_000; // 2 min max
+  const interval = 3000;   // check every 3s
+  const start = Date.now();
+
+  while (Date.now() - start < maxWait) {
+    await new Promise((r) => setTimeout(r, interval));
+    try {
+      const res = await client.get(`/repo/status/${repoFullName}`);
+      const { status, message } = res.data;
+      if (status === "success") return res.data;
+      if (status === "error") throw new Error(message);
+      // status === "loading" → keep polling
+    } catch (err) {
+      if (err.message) throw err;
+      // Network hiccup, keep trying
+    }
+  }
+  throw new Error("Loading timed out — the repo may still be loading in the background");
 }

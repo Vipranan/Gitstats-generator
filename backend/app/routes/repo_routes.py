@@ -1,8 +1,9 @@
 import logging
+import threading
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.database import get_db
+from app.database import get_db, SessionLocal
 from app.models.repo import Repo
 from app.models.commit import Commit
 from app.schemas.schemas import RepoLoadRequest, RepoResponse, StatusResponse
@@ -11,22 +12,58 @@ from app.services.processing_service import load_repo
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/repo", tags=["Repository"])
 
+# Track background loading status per repo
+_loading_status: dict[str, dict] = {}
+
+
+def _background_load(repo_full_name: str):
+    """Run load_repo in a background thread so the API returns immediately."""
+    _loading_status[repo_full_name] = {"status": "loading", "message": "Fetching commits..."}
+    db = SessionLocal()
+    try:
+        repo = load_repo(db, repo_full_name)
+        total = db.query(Commit).filter(Commit.repo_id == repo.id).count()
+        _loading_status[repo_full_name] = {
+            "status": "success",
+            "message": f"Loaded {total} commits for {repo.full_name}",
+        }
+    except Exception as e:
+        logger.error("Background load failed for %s: %s", repo_full_name, e)
+        _loading_status[repo_full_name] = {
+            "status": "error",
+            "message": str(e),
+        }
+    finally:
+        db.close()
+
 
 @router.post("/load", response_model=StatusResponse)
-def load_repository(request: RepoLoadRequest, db: Session = Depends(get_db)):
-    """Fetch commits from GitHub and store in the database."""
-    try:
-        repo = load_repo(db, request.repo)
-        total = db.query(Commit).filter(Commit.repo_id == repo.id).count()
-        return StatusResponse(
-            status="success",
-            message=f"Loaded {total} commits for {repo.full_name}",
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error("Failed to load repo %s: %s", request.repo, e)
-        raise HTTPException(status_code=500, detail=f"Failed to load repository: {e}")
+def load_repository(request: RepoLoadRequest):
+    """Kick off background fetch and return immediately."""
+    repo_name = request.repo.strip()
+    parts = repo_name.split("/")
+    if len(parts) != 2:
+        raise HTTPException(status_code=400, detail=f"Invalid repo format: '{repo_name}'. Expected 'owner/repo'.")
+
+    # If already loading, just report status
+    current = _loading_status.get(repo_name)
+    if current and current["status"] == "loading":
+        return StatusResponse(status="loading", message="Already loading this repository...")
+
+    # Start background thread
+    thread = threading.Thread(target=_background_load, args=(repo_name,), daemon=True)
+    thread.start()
+    return StatusResponse(status="loading", message=f"Started loading {repo_name} in background...")
+
+
+@router.get("/status/{owner}/{name}", response_model=StatusResponse)
+def repo_load_status(owner: str, name: str):
+    """Check the loading status of a repo."""
+    repo_name = f"{owner}/{name}"
+    current = _loading_status.get(repo_name)
+    if not current:
+        return StatusResponse(status="idle", message="No loading in progress")
+    return StatusResponse(status=current["status"], message=current["message"])
 
 
 @router.get("/list", response_model=list[RepoResponse])

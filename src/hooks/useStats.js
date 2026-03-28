@@ -5,13 +5,16 @@ export function useStats(fetchFn, ...args) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const intervalRef = useRef(null);
+  const hasFetched = useRef(false);
 
   const load = useCallback(async () => {
     try {
-      setLoading(true);
+      // Only show loading spinner on initial fetch, not on background re-polls
+      if (!hasFetched.current) setLoading(true);
       setError(null);
       const result = await fetchFn(...args);
       setData(result);
+      hasFetched.current = true;
     } catch (err) {
       setError(err.message ?? "Failed to fetch data");
     } finally {
@@ -20,6 +23,7 @@ export function useStats(fetchFn, ...args) {
   }, [fetchFn, ...args]);
 
   useEffect(() => {
+    hasFetched.current = false;
     load();
     intervalRef.current = setInterval(load, 60_000);
     return () => clearInterval(intervalRef.current);
