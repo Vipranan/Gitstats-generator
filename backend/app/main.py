@@ -26,7 +26,7 @@ scheduler = BackgroundScheduler()
 
 
 def _scheduled_refresh():
-    """Run by APScheduler every 24 hours to pull new commits."""
+    """Run by APScheduler every 30 minutes to pull new commits."""
     logger.info("Scheduled refresh: updating all tracked repos")
     db = SessionLocal()
     try:
@@ -43,9 +43,9 @@ async def lifespan(app: FastAPI):
     init_db()
     logger.info("Database initialized")
 
-    scheduler.add_job(_scheduled_refresh, "interval", hours=24, id="repo_refresh")
+    scheduler.add_job(_scheduled_refresh, "interval", minutes=30, id="repo_refresh")
     scheduler.start()
-    logger.info("Background scheduler started (24h interval)")
+    logger.info("Background scheduler started (30m interval)")
 
     yield
 
@@ -63,8 +63,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — allow the React dev server and common production origins
-origins = [
+# CORS — allow the React dev server, Vercel production, and custom domains
+_origins = [
     "http://localhost:5173",
     "http://localhost:5174",
     "http://localhost:3000",
@@ -73,12 +73,18 @@ origins = [
     "http://127.0.0.1:3000",
 ]
 
+# Add production frontend URL from env (e.g. https://gitstats-generator.vercel.app)
+_frontend_url = os.getenv("FRONTEND_URL")
+if _frontend_url:
+    _origins.append(_frontend_url)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_origin_regex=r"https://.*\.vercel\.app",
 )
 
 # ── Routes ─────────────────────────────────────────────────────────────

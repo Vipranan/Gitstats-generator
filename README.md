@@ -18,7 +18,7 @@ A full-stack Git contribution analytics platform that visualizes GitHub reposito
 - **Leaderboard** — Ranked contributors by score with daily/weekly/monthly period filters and streak badges
 - **Multi-Repo Support** — Track multiple GitHub repositories, switch between them from the sidebar
 - **Dark / Light Mode** — Theme toggle with system preference detection and localStorage persistence
-- **Auto-Refresh** — Frontend polls every 60 seconds; backend scheduler refreshes all repos every 24 hours
+- **Auto-Refresh** — Frontend polls every 60 seconds; backend scheduler refreshes all repos every 30 minutes
 - **Mock Data Fallback** — Frontend works standalone with realistic mock data when the backend is unavailable
 - **Responsive Design** — Mobile-friendly with collapsible sidebar
 
@@ -302,7 +302,7 @@ No code changes required — SQLAlchemy handles the rest.
 2. Backend fetches commits + file changes from GitHub API (with pagination + rate-limit handling)
 3. Data is normalized into 4 tables: repos, contributors, commits, file_changes
 4. Frontend queries `/stats/*` endpoints and renders charts/tables
-5. APScheduler refreshes all repos every 24 hours automatically
+5. APScheduler refreshes all repos every 30 minutes automatically
 6. Frontend auto-refreshes data every 60 seconds via the `useStats` hook
 
 ---
