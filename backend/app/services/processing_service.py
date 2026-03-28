@@ -27,7 +27,14 @@ def _get_or_create_repo(db: Session, owner: str, name: str) -> Repo:
         url=info.get("html_url", f"https://github.com/{full_name}"),
     )
     db.add(repo)
-    db.flush()
+    try:
+        db.flush()
+    except Exception:
+        db.rollback()
+        repo = db.query(Repo).filter(Repo.full_name == full_name).first()
+        if repo:
+            return repo
+        raise
     return repo
 
 
