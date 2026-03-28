@@ -59,9 +59,12 @@ export default function BarChartComponent({
             tickLine={false}
             axisLine={false}
             tickFormatter={(v) => {
-              if (v.includes && v.includes("-")) {
-                const d = new Date(v);
-                return `${d.getMonth() + 1}/${d.getDate()}`;
+              if (typeof v === "string" && v.includes("-W")) {
+                return v.split("-")[1];
+              }
+              if (typeof v === "string" && v.includes("-")) {
+                const d = new Date(v + "T00:00");
+                if (!isNaN(d)) return `${d.getMonth() + 1}/${d.getDate()}`;
               }
               return v;
             }}
