@@ -1,4 +1,5 @@
 import logging
+import threading
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
@@ -12,6 +13,9 @@ from app.utils.date_utils import parse_github_date, iso_week_string
 from app.utils.language_map import detect_language
 
 logger = logging.getLogger(__name__)
+
+# Serialize all repo write operations so SQLite doesn't hit "database is locked"
+_write_lock = threading.Lock()
 
 
 def _get_or_create_repo(db: Session, owner: str, name: str) -> Repo:
@@ -56,7 +60,13 @@ def load_repo(db: Session, repo_full_name: str) -> Repo:
     """
     Main entry point: fetch and store all commit data for a repo.
     Supports incremental updates — only fetches new commits.
+    Uses a threading lock to prevent SQLite "database is locked" errors.
     """
+    with _write_lock:
+        return _load_repo_impl(db, repo_full_name)
+
+
+def _load_repo_impl(db: Session, repo_full_name: str) -> Repo:
     parts = repo_full_name.strip().split("/")
     if len(parts) != 2:
         raise ValueError(f"Invalid repo format: '{repo_full_name}'. Expected 'owner/repo'.")
