@@ -10,14 +10,19 @@ import app.models.file_change  # noqa: F401
 
 
 @pytest.fixture
-def db():
-    engine = create_engine(
+def engine():
+    e = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
     )
-    Base.metadata.create_all(engine)
+    Base.metadata.create_all(e)
+    yield e
+    Base.metadata.drop_all(e)
+
+
+@pytest.fixture
+def db(engine):
     Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     session = Session()
     yield session
     session.close()
-    Base.metadata.drop_all(engine)
