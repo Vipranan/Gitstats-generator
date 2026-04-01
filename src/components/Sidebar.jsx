@@ -26,11 +26,13 @@ export default function Sidebar({ repos, repo, onRepoChange, onReposRefresh, ope
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const REPO_NAME_RE = /^[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+$/;
+
   async function handleAddRepo(e) {
     e.preventDefault();
     const value = newRepo.trim();
-    if (!value || !value.includes("/")) {
-      setError("Use format: owner/repo");
+    if (!value || !REPO_NAME_RE.test(value)) {
+      setError("Use format: owner/repo (letters, numbers, . _ - only)");
       return;
     }
     setLoading(true);
