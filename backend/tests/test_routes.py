@@ -26,3 +26,4 @@ def test_load_repo_rejects_invalid_format(bad_input):
 def test_load_repo_accepts_valid_format(_mock_thread):
     resp = client.post("/repo/load", json={"repo": "owner/repo"})
     assert resp.status_code == 200
+    assert resp.json()["status"] == "loading"

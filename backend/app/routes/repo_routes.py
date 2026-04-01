@@ -13,7 +13,7 @@ from app.services.processing_service import load_repo
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/repo", tags=["Repository"])
 
-_REPO_NAME_RE = re.compile(r"^[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+$")
+_REPO_NAME_RE = re.compile(r"^[a-zA-Z0-9._-]{1,39}/[a-zA-Z0-9._-]{1,100}$")
 
 # Track background loading status per repo
 _loading_status: dict[str, dict] = {}
