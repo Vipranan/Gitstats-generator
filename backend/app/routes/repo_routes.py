@@ -1,4 +1,5 @@
 import logging
+import re
 import threading
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -11,6 +12,8 @@ from app.services.processing_service import load_repo
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/repo", tags=["Repository"])
+
+_REPO_NAME_RE = re.compile(r"^[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+$")
 
 # Track background loading status per repo
 _loading_status: dict[str, dict] = {}
@@ -41,9 +44,11 @@ def _background_load(repo_full_name: str):
 def load_repository(request: RepoLoadRequest):
     """Kick off background fetch and return immediately."""
     repo_name = request.repo.strip()
-    parts = repo_name.split("/")
-    if len(parts) != 2:
-        raise HTTPException(status_code=400, detail=f"Invalid repo format: '{repo_name}'. Expected 'owner/repo'.")
+    if not _REPO_NAME_RE.match(repo_name):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid format '{repo_name}'. Use: owner/repo (letters, numbers, . _ - only)",
+        )
 
     # If already loading, just report status
     current = _loading_status.get(repo_name)
