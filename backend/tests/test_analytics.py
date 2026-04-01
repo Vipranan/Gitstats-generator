@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+from unittest.mock import patch
 from app.models.repo import Repo
 from app.models.contributor import Contributor
 from app.models.commit import Commit
@@ -8,6 +9,7 @@ from app.services.analytics_service import (
     get_language_stats,
     get_leaderboard,
 )
+from app.services.processing_service import _load_repo_impl
 
 
 def _seed(db):
@@ -87,3 +89,25 @@ def test_get_leaderboard_ranked(db):
     assert results[1]["rank"] == 2
     # Alice has more commits, should be rank 1
     assert results[0]["name"] == "Alice"
+
+
+def test_load_repo_impl_batches_commit_detail_calls(db):
+    """Commit detail fetches happen in a thread pool, not serially."""
+    fake_commits = [
+        {
+            "sha": f"sha{i}",
+            "commit": {
+                "author": {"name": "Dev", "email": "dev@example.com", "date": "2026-01-01T00:00:00Z"},
+                "message": f"commit {i}",
+            },
+        }
+        for i in range(3)
+    ]
+
+    with (
+        patch("app.services.processing_service.fetch_repo_info", return_value={"name": "r", "html_url": "https://github.com/o/r"}),
+        patch("app.services.processing_service.fetch_commits", return_value=fake_commits),
+        patch("app.services.processing_service.fetch_commit_detail", return_value={"files": []}) as mock_detail,
+    ):
+        _load_repo_impl(db, "o/r")
+        assert mock_detail.call_count == 3

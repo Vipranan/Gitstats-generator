@@ -1,5 +1,6 @@
 import logging
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
@@ -74,28 +75,24 @@ def _load_repo_impl(db: Session, repo_full_name: str) -> Repo:
 
     repo = _get_or_create_repo(db, owner, name)
 
-    # Incremental: only fetch commits after the last known date
     since = None
     if repo.last_fetched_at:
         since = repo.last_fetched_at.isoformat()
         logger.info("Incremental fetch for %s since %s", repo.full_name, since)
 
     raw_commits = fetch_commits(owner, name, since=since)
-    new_count = 0
 
+    # Phase 1: Create Commit rows (serial, DB writes need single thread)
+    new_commit_pairs: list[tuple[int, str]] = []  # (commit.id, sha)
     for raw in raw_commits:
         sha = raw.get("sha")
         if not sha:
             continue
-
-        # Skip duplicates
-        existing = db.query(Commit).filter(Commit.sha == sha).first()
-        if existing:
+        if db.query(Commit).filter(Commit.sha == sha).first():
             continue
 
         commit_data = raw.get("commit", {})
         author_info = commit_data.get("author", {})
-
         author_name = author_info.get("name", "Unknown")
         author_email = author_info.get("email", "unknown@unknown.com")
         date_str = author_info.get("date")
@@ -106,7 +103,6 @@ def _load_repo_impl(db: Session, repo_full_name: str) -> Repo:
 
         commit_date = parse_github_date(date_str)
         week = iso_week_string(commit_date)
-
         contributor = _get_or_create_contributor(db, author_name, author_email)
 
         commit = Commit(
@@ -119,33 +115,37 @@ def _load_repo_impl(db: Session, repo_full_name: str) -> Repo:
         )
         db.add(commit)
         db.flush()
+        new_commit_pairs.append((commit.id, sha))
 
-        # Fetch file-level changes
-        try:
-            detail = fetch_commit_detail(owner, name, sha)
-            files = detail.get("files", [])
-            for f in files:
-                filename = f.get("filename", "")
-                language = detect_language(filename)
-                # Skip files with no recognized language
-                if language is None:
-                    continue
-                fc = FileChange(
-                    commit_id=commit.id,
-                    filename=filename,
-                    language=language,
-                    additions=f.get("additions", 0),
-                    deletions=f.get("deletions", 0),
-                )
-                db.add(fc)
-        except Exception as e:
-            logger.warning("Failed to fetch detail for %s: %s", sha[:8], e)
+    # Phase 2: Fetch file-level details in parallel (network I/O only, no DB)
+    if new_commit_pairs:
+        def _fetch_files(commit_id_sha: tuple[int, str]) -> tuple[int, list]:
+            commit_id, sha = commit_id_sha
+            try:
+                detail = fetch_commit_detail(owner, name, sha)
+                return commit_id, detail.get("files", [])
+            except Exception as e:
+                logger.warning("Failed to fetch detail for %s: %s", sha[:8], e)
+                return commit_id, []
 
-        new_count += 1
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            for commit_id, files in executor.map(_fetch_files, new_commit_pairs):
+                for f in files:
+                    filename = f.get("filename", "")
+                    language = detect_language(filename)
+                    if language is None:
+                        continue
+                    db.add(FileChange(
+                        commit_id=commit_id,
+                        filename=filename,
+                        language=language,
+                        additions=f.get("additions", 0),
+                        deletions=f.get("deletions", 0),
+                    ))
 
     repo.last_fetched_at = datetime.now(timezone.utc)
     db.commit()
-    logger.info("Stored %d new commits for %s", new_count, repo.full_name)
+    logger.info("Stored %d new commits for %s", len(new_commit_pairs), repo.full_name)
     return repo
 
 
