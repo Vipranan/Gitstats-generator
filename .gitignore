@@ -28,3 +28,4 @@ dist-ssr
 *.db
 __pycache__
 backend/venv
+.superpowers/
