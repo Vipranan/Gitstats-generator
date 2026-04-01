@@ -4,16 +4,17 @@ export function useStats(fetchFn, ...args) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isMock, setIsMock] = useState(false);
   const intervalRef = useRef(null);
   const hasFetched = useRef(false);
 
   const load = useCallback(async () => {
     try {
-      // Only show loading spinner on initial fetch, not on background re-polls
       if (!hasFetched.current) setLoading(true);
       setError(null);
       const result = await fetchFn(...args);
-      setData(result);
+      setData(result.data);
+      setIsMock(result.isMock);
       hasFetched.current = true;
     } catch (err) {
       setError(err.message ?? "Failed to fetch data");
@@ -26,8 +27,22 @@ export function useStats(fetchFn, ...args) {
     hasFetched.current = false;
     load();
     intervalRef.current = setInterval(load, 60_000);
-    return () => clearInterval(intervalRef.current);
+
+    function handleVisibilityChange() {
+      if (document.hidden) {
+        clearInterval(intervalRef.current);
+      } else {
+        load();
+        intervalRef.current = setInterval(load, 60_000);
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      clearInterval(intervalRef.current);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [load]);
 
-  return { data, loading, error, refetch: load };
+  return { data, loading, error, isMock, refetch: load };
 }
