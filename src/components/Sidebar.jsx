@@ -20,13 +20,13 @@ const NAV = [
   { to: "/leaderboard", label: "Leaderboard", icon: Trophy },
 ];
 
+const REPO_NAME_RE = /^[a-zA-Z0-9._-]{1,39}\/[a-zA-Z0-9._-]{1,100}$/;
+
 export default function Sidebar({ repos, repo, onRepoChange, onReposRefresh, open, onClose }) {
   const [adding, setAdding] = useState(false);
   const [newRepo, setNewRepo] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  const REPO_NAME_RE = /^[a-zA-Z0-9._-]{1,39}\/[a-zA-Z0-9._-]{1,100}$/;
 
   async function handleAddRepo(e) {
     e.preventDefault();

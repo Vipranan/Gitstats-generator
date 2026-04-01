@@ -25,8 +25,8 @@ export default function Overview({ repo }) {
     daily.loading || weekly.loading || contributors.loading || languages.loading;
 
   const anyError = daily.error || weekly.error || contributors.error || languages.error;
-  const anyRefetch = daily.refetch;
-  const showMock = daily.isMock;
+  const anyRefetch = () => { daily.refetch(); weekly.refetch(); contributors.refetch(); languages.refetch(); };
+  const showMock = daily.isMock || weekly.isMock || contributors.isMock || languages.isMock;
 
   const stats = useMemo(() => {
     if (!daily.data || !contributors.data || !languages.data) return null;
