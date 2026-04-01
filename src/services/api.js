@@ -143,11 +143,10 @@ const MOCK = {
 // ── API Functions ─────────────────────────────────────────────────────
 
 async function fetchWithFallback(endpoint, mockKey, params = {}) {
-  // Retry once on network/timeout errors (handles Render cold starts)
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const res = await client.get(endpoint, { params });
-      return res.data;
+      return { data: res.data, isMock: false };
     } catch (err) {
       const isRetryable = !err.response || err.code === "ECONNABORTED";
       if (isRetryable && attempt === 0) {
@@ -156,7 +155,7 @@ async function fetchWithFallback(endpoint, mockKey, params = {}) {
         continue;
       }
       console.warn(`API unavailable for ${endpoint}, using mock data`);
-      return MOCK[mockKey];
+      return { data: MOCK[mockKey], isMock: true };
     }
   }
 }
