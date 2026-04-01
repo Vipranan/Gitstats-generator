@@ -4,6 +4,7 @@ import StatCard from "../components/StatCard";
 import LineChartComponent from "../components/Charts/LineChartComponent";
 import BarChartComponent from "../components/Charts/BarChartComponent";
 import Loader from "../components/Loader";
+import EmptyState from "../components/EmptyState";
 import ErrorBanner from "../components/ErrorBanner";
 import MockDataNote from "../components/MockDataNote";
 import { useStats } from "../hooks/useStats";
@@ -52,6 +53,13 @@ export default function Overview({ repo }) {
   }, [daily.data, contributors.data, languages.data]);
 
   if (loading) return <Loader />;
+
+  if (anyError && !stats) return (
+    <>
+      <ErrorBanner message={anyError} onRetry={anyRefetch} />
+      <EmptyState message="No data available" />
+    </>
+  );
 
   return (
     <div className="space-y-6">

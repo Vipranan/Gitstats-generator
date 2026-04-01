@@ -2,6 +2,7 @@ import { useState } from "react";
 import ContributorsTable from "../components/Tables/ContributorsTable";
 import ContributorModal from "../components/ContributorModal";
 import Loader from "../components/Loader";
+import EmptyState from "../components/EmptyState";
 import ErrorBanner from "../components/ErrorBanner";
 import MockDataNote from "../components/MockDataNote";
 import { useStats } from "../hooks/useStats";
@@ -12,6 +13,13 @@ export default function Contributors({ repo }) {
   const [selected, setSelected] = useState(null);
 
   if (loading) return <Loader />;
+
+  if (error && !data) return (
+    <>
+      <ErrorBanner message={error} onRetry={refetch} />
+      <EmptyState message="No data available" />
+    </>
+  );
 
   return (
     <div className="space-y-6">

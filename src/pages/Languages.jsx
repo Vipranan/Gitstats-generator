@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import PieChartComponent from "../components/Charts/PieChartComponent";
 import Loader from "../components/Loader";
+import EmptyState from "../components/EmptyState";
 import ErrorBanner from "../components/ErrorBanner";
 import MockDataNote from "../components/MockDataNote";
 import Pagination from "../components/Pagination";
@@ -26,6 +27,13 @@ export default function Languages({ repo }) {
   const { page, setPage, totalPages, paginatedData: pagedContributors } = usePagination(perContributor, 10);
 
   if (loading) return <Loader />;
+
+  if (error && !data) return (
+    <>
+      <ErrorBanner message={error} onRetry={refetch} />
+      <EmptyState message="No data available" />
+    </>
+  );
 
   return (
     <div className="space-y-6">

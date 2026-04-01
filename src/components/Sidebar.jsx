@@ -26,7 +26,7 @@ export default function Sidebar({ repos, repo, onRepoChange, onReposRefresh, ope
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const REPO_NAME_RE = /^[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+$/;
+  const REPO_NAME_RE = /^[a-zA-Z0-9._-]{1,39}\/[a-zA-Z0-9._-]{1,100}$/;
 
   async function handleAddRepo(e) {
     e.preventDefault();

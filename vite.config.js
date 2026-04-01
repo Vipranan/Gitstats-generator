@@ -4,8 +4,8 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  oxc: {
-    jsx: { runtime: 'automatic' },
+  esbuild: {
+    jsx: 'automatic',
   },
   test: {
     environment: 'jsdom',

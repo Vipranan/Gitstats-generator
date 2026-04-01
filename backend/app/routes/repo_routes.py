@@ -55,6 +55,10 @@ def load_repository(request: RepoLoadRequest):
     if current and current["status"] == "loading":
         return StatusResponse(status="loading", message="Already loading this repository...")
 
+    # Set status before starting thread to prevent race condition where a second
+    # concurrent POST could pass the dedup check before the thread writes "loading"
+    _loading_status[repo_name] = {"status": "loading", "message": "Fetching commits..."}
+
     # Start background thread
     thread = threading.Thread(target=_background_load, args=(repo_name,), daemon=True)
     thread.start()

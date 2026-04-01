@@ -49,6 +49,13 @@ export default function Leaderboard({ repo }) {
 
   if (loading) return <Loader />;
 
+  if (error && !data) return (
+    <>
+      <ErrorBanner message={error} onRetry={refetch} />
+      <EmptyState message="No data available" />
+    </>
+  );
+
   return (
     <div className="space-y-6">
       {error && <ErrorBanner message={error} onRetry={refetch} />}
