@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Date, ForeignKey
+from sqlalchemy import Column, Integer, String, Date, ForeignKey, Index
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -18,3 +18,7 @@ class Commit(Base):
     repo = relationship("Repo", back_populates="commits")
     contributor = relationship("Contributor", back_populates="commits")
     file_changes = relationship("FileChange", back_populates="commit", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index("ix_commits_repo_date", "repo_id", "date"),
+    )
