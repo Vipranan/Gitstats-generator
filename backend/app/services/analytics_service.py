@@ -2,7 +2,7 @@ import logging
 from datetime import date, timedelta
 from collections import defaultdict
 
-from sqlalchemy import func, desc
+from sqlalchemy import func, desc, select
 from sqlalchemy.orm import Session
 
 from app.models.repo import Repo
@@ -127,15 +127,15 @@ def get_contributor_stats(
     end_date: date | None = None,
 ) -> list[dict]:
     repo_id = _resolve_repo(db, repo_full_name)
-
-    # Base query for commits
     commit_q = _base_commit_query(db, repo_id, start_date, end_date)
-    commit_ids = [c.id for c in commit_q.with_entities(Commit.id).all()]
 
-    if not commit_ids:
+    if not commit_q.with_entities(Commit.id).first():
         return []
 
-    # Aggregate per contributor
+    commit_subq = commit_q.with_entities(Commit.id).subquery()
+    commit_subq_sel = select(commit_subq)
+
+    # Single query: commit count per contributor
     contrib_rows = (
         commit_q
         .join(Contributor)
@@ -149,76 +149,83 @@ def get_contributor_stats(
         .order_by(desc("total_commits"))
         .all()
     )
+    if not contrib_rows:
+        return []
+
+    # Single query: lines added/deleted per contributor
+    lines_map = {
+        row.contributor_id: (row.added, row.deleted)
+        for row in db.query(
+            Commit.contributor_id,
+            func.coalesce(func.sum(FileChange.additions), 0).label("added"),
+            func.coalesce(func.sum(FileChange.deletions), 0).label("deleted"),
+        )
+        .join(FileChange, FileChange.commit_id == Commit.id)
+        .filter(Commit.id.in_(commit_subq_sel))
+        .group_by(Commit.contributor_id)
+        .all()
+    }
+
+    # Single query: language breakdown per contributor
+    lang_map = defaultdict(list)
+    for row in (
+        db.query(
+            Commit.contributor_id,
+            FileChange.language,
+            func.sum(FileChange.additions + FileChange.deletions).label("total_lines"),
+        )
+        .join(FileChange, FileChange.commit_id == Commit.id)
+        .filter(Commit.id.in_(commit_subq_sel), FileChange.language.isnot(None))
+        .group_by(Commit.contributor_id, FileChange.language)
+        .order_by(Commit.contributor_id, desc("total_lines"))
+        .all()
+    ):
+        lang_map[row.contributor_id].append((row.language, row.total_lines))
+
+    # Single query: weekly activity per contributor
+    weekly_map = defaultdict(list)
+    for row in (
+        commit_q
+        .with_entities(
+            Commit.contributor_id,
+            Commit.week,
+            func.count(Commit.id).label("cnt"),
+        )
+        .group_by(Commit.contributor_id, Commit.week)
+        .order_by(Commit.contributor_id, Commit.week)
+        .all()
+    ):
+        weekly_map[row.contributor_id].append({"week": row.week, "commits": row.cnt})
 
     results = []
     for row in contrib_rows:
         cid = row.id
+        added, deleted = lines_map.get(cid, (0, 0))
 
-        # Lines added/deleted
-        lines = (
-            db.query(
-                func.coalesce(func.sum(FileChange.additions), 0).label("added"),
-                func.coalesce(func.sum(FileChange.deletions), 0).label("deleted"),
-            )
-            .join(Commit)
-            .filter(Commit.contributor_id == cid, Commit.id.in_(commit_ids))
-            .first()
-        )
-
-        # Language breakdown for this contributor
-        lang_rows = (
-            db.query(
-                FileChange.language,
-                func.sum(FileChange.additions + FileChange.deletions).label("total_lines"),
-            )
-            .join(Commit)
-            .filter(
-                Commit.contributor_id == cid,
-                Commit.id.in_(commit_ids),
-                FileChange.language.isnot(None),
-            )
-            .group_by(FileChange.language)
-            .order_by(desc("total_lines"))
-            .all()
-        )
-
-        total_lang_lines = sum(r.total_lines for r in lang_rows) or 1
-        lang_breakdown = []
-        top_language = "Unknown"
-        for i, lr in enumerate(lang_rows):
-            pct = round((lr.total_lines / total_lang_lines) * 100)
-            if i == 0:
-                top_language = lr.language
-            lang_breakdown.append({
-                "language": lr.language,
-                "percentage": pct,
-                "color": LANGUAGE_COLORS.get(lr.language),
-            })
-
-        # Weekly activity
-        weekly_rows = (
-            commit_q
-            .filter(Commit.contributor_id == cid)
-            .with_entities(Commit.week, func.count(Commit.id).label("cnt"))
-            .group_by(Commit.week)
-            .order_by(Commit.week)
-            .all()
-        )
-        weekly_activity = [{"week": w.week, "commits": w.cnt} for w in weekly_rows]
+        lang_entries = lang_map.get(cid, [])
+        total_lang_lines = sum(lines for _, lines in lang_entries) or 1
+        top_language = lang_entries[0][0] if lang_entries else "Unknown"
+        lang_breakdown = [
+            {
+                "language": lang,
+                "percentage": round((lines / total_lang_lines) * 100),
+                "color": LANGUAGE_COLORS.get(lang),
+            }
+            for lang, lines in lang_entries
+        ]
 
         streak = _compute_streak(db, cid, repo_id)
-
         avatar = f"https://api.dicebear.com/7.x/initials/svg?seed={row.name.replace(' ', '+')}"
 
         results.append({
             "name": row.name,
             "avatar": avatar,
             "totalCommits": row.total_commits,
-            "linesAdded": lines.added if lines else 0,
-            "linesDeleted": lines.deleted if lines else 0,
+            "linesAdded": added,
+            "linesDeleted": deleted,
             "topLanguage": top_language,
             "languageBreakdown": lang_breakdown,
-            "weeklyActivity": weekly_activity,
+            "weeklyActivity": weekly_map.get(cid, []),
             "streak": streak,
         })
 
@@ -234,55 +241,53 @@ def get_language_stats(
     end_date: date | None = None,
 ) -> list[dict]:
     repo_id = _resolve_repo(db, repo_full_name)
-
     commit_q = _base_commit_query(db, repo_id, start_date, end_date)
-    commit_ids = [c.id for c in commit_q.with_entities(Commit.id).all()]
+    commit_subq = commit_q.with_entities(Commit.id).subquery()
+    commit_subq_sel = select(commit_subq)
 
-    if not commit_ids:
-        return []
-
-    # Aggregate by language
     lang_rows = (
         db.query(
             FileChange.language,
             func.sum(FileChange.additions + FileChange.deletions).label("total_lines"),
         )
-        .filter(FileChange.commit_id.in_(commit_ids), FileChange.language.isnot(None))
+        .filter(FileChange.commit_id.in_(commit_subq_sel), FileChange.language.isnot(None))
         .group_by(FileChange.language)
         .order_by(desc("total_lines"))
         .all()
     )
 
+    if not lang_rows:
+        return []
+
     grand_total = sum(r.total_lines for r in lang_rows) or 1
+
+    # Single query: contributor breakdown for all languages at once
+    contrib_by_lang = defaultdict(list)
+    for row in (
+        db.query(
+            FileChange.language,
+            Contributor.name,
+            func.sum(FileChange.additions + FileChange.deletions).label("lines"),
+        )
+        .join(Commit, Commit.id == FileChange.commit_id)
+        .join(Contributor, Contributor.id == Commit.contributor_id)
+        .filter(FileChange.commit_id.in_(commit_subq_sel), FileChange.language.isnot(None))
+        .group_by(FileChange.language, Contributor.name)
+        .order_by(FileChange.language, desc("lines"))
+        .all()
+    ):
+        contrib_by_lang[row.language].append((row.name, row.lines))
 
     results = []
     for lr in lang_rows:
         pct = round((lr.total_lines / grand_total) * 100)
         if pct == 0:
             continue
-
-        # Contributors for this language
-        contrib_rows = (
-            db.query(
-                Contributor.name,
-                func.sum(FileChange.additions + FileChange.deletions).label("lines"),
-            )
-            .join(Commit, Commit.contributor_id == Contributor.id)
-            .join(FileChange, FileChange.commit_id == Commit.id)
-            .filter(
-                FileChange.language == lr.language,
-                Commit.id.in_(commit_ids),
-            )
-            .group_by(Contributor.name)
-            .order_by(desc("lines"))
-            .all()
-        )
         lang_total = lr.total_lines or 1
         contributors = [
-            {"name": c.name, "percentage": round((c.lines / lang_total) * 100)}
-            for c in contrib_rows
+            {"name": name, "percentage": round((lines / lang_total) * 100)}
+            for name, lines in contrib_by_lang.get(lr.language, [])
         ]
-
         results.append({
             "language": lr.language,
             "percentage": pct,
@@ -304,7 +309,6 @@ def get_leaderboard(
 ) -> list[dict]:
     repo_id = _resolve_repo(db, repo_full_name)
 
-    # Default date ranges based on period
     if not end_date:
         end_date = date.today()
     if not start_date:
@@ -316,10 +320,8 @@ def get_leaderboard(
             start_date = end_date - timedelta(weeks=1)
 
     commit_q = _base_commit_query(db, repo_id, start_date, end_date)
-    commit_ids = [c.id for c in commit_q.with_entities(Commit.id).all()]
-
-    if not commit_ids:
-        return []
+    commit_subq = commit_q.with_entities(Commit.id).subquery()
+    commit_subq_sel = select(commit_subq)
 
     contrib_rows = (
         commit_q
@@ -334,23 +336,29 @@ def get_leaderboard(
         .all()
     )
 
+    if not contrib_rows:
+        return []
+
+    # Single query: lines per contributor
+    lines_map = {
+        row.contributor_id: (row.added, row.deleted)
+        for row in db.query(
+            Commit.contributor_id,
+            func.coalesce(func.sum(FileChange.additions), 0).label("added"),
+            func.coalesce(func.sum(FileChange.deletions), 0).label("deleted"),
+        )
+        .join(FileChange, FileChange.commit_id == Commit.id)
+        .filter(Commit.id.in_(commit_subq_sel))
+        .group_by(Commit.contributor_id)
+        .all()
+    }
+
     results = []
     for rank, row in enumerate(contrib_rows, 1):
-        lines = (
-            db.query(
-                func.coalesce(func.sum(FileChange.additions), 0).label("added"),
-                func.coalesce(func.sum(FileChange.deletions), 0).label("deleted"),
-            )
-            .join(Commit)
-            .filter(Commit.contributor_id == row.id, Commit.id.in_(commit_ids))
-            .first()
-        )
-        added = lines.added if lines else 0
-        deleted = lines.deleted if lines else 0
+        added, deleted = lines_map.get(row.id, (0, 0))
         score = row.total_commits * 2 + (added // 100)
         streak = _compute_streak(db, row.id, repo_id)
         avatar = f"https://api.dicebear.com/7.x/initials/svg?seed={row.name.replace(' ', '+')}"
-
         results.append({
             "rank": rank,
             "name": row.name,
