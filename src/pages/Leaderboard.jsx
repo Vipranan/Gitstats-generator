@@ -3,6 +3,8 @@ import { motion } from "framer-motion";
 import { Trophy, Medal, Flame } from "lucide-react";
 import Loader from "../components/Loader";
 import EmptyState from "../components/EmptyState";
+import ErrorBanner from "../components/ErrorBanner";
+import MockDataNote from "../components/MockDataNote";
 import { useStats } from "../hooks/useStats";
 import { fetchLeaderboard } from "../services/api";
 
@@ -40,20 +42,17 @@ function RankBadge({ rank }) {
 
 export default function Leaderboard({ repo }) {
   const [period, setPeriod] = useState("weekly");
-  const { data, loading } = useStats(fetchLeaderboard, repo, period);
+  const { data, loading, error, isMock, refetch } = useStats(fetchLeaderboard, repo, period);
 
   if (loading) return <Loader />;
 
   return (
     <div className="space-y-6">
+      {error && <ErrorBanner message={error} onRetry={refetch} />}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Leaderboard
-          </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Top contributors ranked by contribution score
-          </p>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Leaderboard</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Top contributors ranked by contribution score</p>
         </div>
         <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 dark:border-gray-700 dark:bg-gray-800">
           {PERIODS.map((p) => (
@@ -89,43 +88,28 @@ export default function Leaderboard({ repo }) {
               }`}
             >
               <RankBadge rank={entry.rank} />
-
-              <img
-                src={entry.avatar}
-                alt={entry.name}
-                className="h-10 w-10 rounded-full bg-gray-100 dark:bg-gray-800"
-              />
-
+              <img src={entry.avatar} alt={entry.name} className="h-10 w-10 rounded-full bg-gray-100 dark:bg-gray-800" />
               <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold text-gray-900 dark:text-white">
-                  {entry.name}
-                </p>
+                <p className="truncate font-semibold text-gray-900 dark:text-white">{entry.name}</p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {entry.commits} commits &middot; +
-                  {entry.linesAdded.toLocaleString()} / -
-                  {entry.linesDeleted.toLocaleString()} lines
+                  {entry.commits} commits &middot; +{entry.linesAdded.toLocaleString()} / -{entry.linesDeleted.toLocaleString()} lines
                 </p>
               </div>
-
               {entry.streak > 7 && (
                 <span className="hidden items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-600 dark:bg-amber-500/10 dark:text-amber-400 sm:inline-flex">
                   <Flame size={12} />
                   {entry.streak}d streak
                 </span>
               )}
-
               <div className="text-right">
-                <p className="text-lg font-bold text-primary-600 dark:text-primary-400">
-                  {entry.score.toLocaleString()}
-                </p>
-                <p className="text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                  Score
-                </p>
+                <p className="text-lg font-bold text-primary-600 dark:text-primary-400">{entry.score.toLocaleString()}</p>
+                <p className="text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">Score</p>
               </div>
             </motion.div>
           ))}
         </div>
       )}
+      {isMock && <MockDataNote />}
     </div>
   );
 }

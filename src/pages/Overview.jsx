@@ -4,6 +4,8 @@ import StatCard from "../components/StatCard";
 import LineChartComponent from "../components/Charts/LineChartComponent";
 import BarChartComponent from "../components/Charts/BarChartComponent";
 import Loader from "../components/Loader";
+import ErrorBanner from "../components/ErrorBanner";
+import MockDataNote from "../components/MockDataNote";
 import { useStats } from "../hooks/useStats";
 import {
   fetchDailyStats,
@@ -20,6 +22,10 @@ export default function Overview({ repo }) {
 
   const loading =
     daily.loading || weekly.loading || contributors.loading || languages.loading;
+
+  const anyError = daily.error || weekly.error || contributors.error || languages.error;
+  const anyRefetch = daily.refetch;
+  const showMock = daily.isMock;
 
   const stats = useMemo(() => {
     if (!daily.data || !contributors.data || !languages.data) return null;
@@ -49,6 +55,7 @@ export default function Overview({ repo }) {
 
   return (
     <div className="space-y-6">
+      {anyError && <ErrorBanner message={anyError} onRetry={anyRefetch} />}
       {stats && (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
@@ -106,6 +113,7 @@ export default function Overview({ repo }) {
           color="#818cf8"
         />
       </div>
+      {showMock && <MockDataNote />}
     </div>
   );
 }
