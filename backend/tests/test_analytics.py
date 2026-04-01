@@ -10,6 +10,7 @@ from app.services.analytics_service import (
     get_leaderboard,
 )
 from app.services.processing_service import _load_repo_impl
+from app.utils.date_utils import iso_week_string
 
 
 def _seed(db):
@@ -24,11 +25,15 @@ def _seed(db):
     db.flush()
 
     today = date.today()
+    week = iso_week_string(today)
     c1 = Commit(sha="aaa", repo_id=repo.id, contributor_id=alice.id,
-                date=today, week="2026-W14", message="feat: add thing")
+                date=today, week=week, message="feat: add thing")
     c2 = Commit(sha="bbb", repo_id=repo.id, contributor_id=bob.id,
-                date=today - timedelta(days=1), week="2026-W14", message="fix: bug")
-    db.add_all([c1, c2])
+                date=today - timedelta(days=1), week=iso_week_string(today - timedelta(days=1)), message="fix: bug")
+    # Second commit for Alice so she reliably ranks #1 over Bob
+    c3 = Commit(sha="ccc", repo_id=repo.id, contributor_id=alice.id,
+                date=today - timedelta(days=2), week=iso_week_string(today - timedelta(days=2)), message="feat: more")
+    db.add_all([c1, c2, c3])
     db.flush()
 
     db.add_all([

@@ -109,12 +109,15 @@ def _compute_streak(db: Session, contributor_id: int, repo_id: int | None) -> in
     if not dates:
         return 0
 
-    streak = 0
-    expected = date.today()
-    for d in dates:
-        if d == expected or d == expected - timedelta(days=1):
+    today = date.today()
+    # Allow streak to start from today or yesterday
+    if dates[0] < today - timedelta(days=1):
+        return 0
+
+    streak = 1
+    for i in range(1, len(dates)):
+        if dates[i] == dates[i - 1] - timedelta(days=1):
             streak += 1
-            expected = d - timedelta(days=1)
         else:
             break
     return streak
