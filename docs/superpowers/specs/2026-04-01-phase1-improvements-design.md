@@ -92,7 +92,7 @@ SQLAlchemy will emit these via `__table_args__`. No migration needed for SQLite 
 **Fix:** Add a shared `ErrorBanner` component (`src/components/ErrorBanner.jsx`):
 - Displays above existing page content when `error` is set and `data` is already loaded
 - Shows the error message + a "Retry" button (calls `refetch`)
-- When `error` is set and `data` is null (first load failed), shows the banner with an empty state below it
+- When `error` is set and `data` is null (first load failed), shows the banner with the existing `EmptyState` component below it
 
 Each page adds: `{error && <ErrorBanner message={error} onRetry={refetch} />}`
 
@@ -100,7 +100,7 @@ Each page adds: `{error && <ErrorBanner message={error} onRetry={refetch} />}`
 
 ### 6. Mock Data Footer Note
 
-**Files:** `src/services/api.js`, `src/App.jsx` or page components
+**Files:** `src/services/api.js`, `src/hooks/useStats.js`, page components
 
 **Problem:** `fetchWithFallback` silently returns mock data when the backend is unreachable. Users see realistic-looking fake data with no indication.
 
