@@ -5,7 +5,9 @@ import Loader from "../components/Loader";
 import EmptyState from "../components/EmptyState";
 import ErrorBanner from "../components/ErrorBanner";
 import MockDataNote from "../components/MockDataNote";
+import Pagination from "../components/Pagination";
 import { useStats } from "../hooks/useStats";
+import { usePagination } from "../hooks/usePagination";
 import { fetchLeaderboard } from "../services/api";
 
 const PERIODS = [
@@ -43,6 +45,7 @@ function RankBadge({ rank }) {
 export default function Leaderboard({ repo }) {
   const [period, setPeriod] = useState("weekly");
   const { data, loading, error, isMock, refetch } = useStats(fetchLeaderboard, repo, period);
+  const { page, setPage, totalPages, paginatedData } = usePagination(data, 10);
 
   if (loading) return <Loader />;
 
@@ -75,7 +78,7 @@ export default function Leaderboard({ repo }) {
         <EmptyState message="No leaderboard data" />
       ) : (
         <div className="space-y-3">
-          {data.map((entry, i) => (
+          {paginatedData.map((entry, i) => (
             <motion.div
               key={entry.name}
               initial={{ opacity: 0, x: -12 }}
@@ -109,6 +112,13 @@ export default function Leaderboard({ repo }) {
           ))}
         </div>
       )}
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        setPage={setPage}
+        totalItems={data?.length ?? 0}
+        pageSize={10}
+      />
       {isMock && <MockDataNote />}
     </div>
   );

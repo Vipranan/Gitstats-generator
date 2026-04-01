@@ -3,7 +3,9 @@ import PieChartComponent from "../components/Charts/PieChartComponent";
 import Loader from "../components/Loader";
 import ErrorBanner from "../components/ErrorBanner";
 import MockDataNote from "../components/MockDataNote";
+import Pagination from "../components/Pagination";
 import { useStats } from "../hooks/useStats";
+import { usePagination } from "../hooks/usePagination";
 import { fetchLanguages } from "../services/api";
 
 export default function Languages({ repo }) {
@@ -20,6 +22,8 @@ export default function Languages({ repo }) {
     });
     return Object.entries(map).map(([name, langs]) => ({ name, ...langs }));
   }, [data]);
+
+  const { page, setPage, totalPages, paginatedData: pagedContributors } = usePagination(perContributor, 10);
 
   if (loading) return <Loader />;
 
@@ -76,7 +80,7 @@ export default function Languages({ repo }) {
                 </tr>
               </thead>
               <tbody>
-                {perContributor.map((row) => (
+                {pagedContributors.map((row) => (
                   <tr key={row.name} className="border-b border-gray-50 dark:border-gray-800/50">
                     <td className="px-4 py-2 font-medium text-gray-900 dark:text-white">{row.name}</td>
                     {data?.map((l) => (
@@ -88,6 +92,13 @@ export default function Languages({ repo }) {
                 ))}
               </tbody>
             </table>
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              setPage={setPage}
+              totalItems={perContributor.length}
+              pageSize={10}
+            />
           </div>
         </div>
       )}
