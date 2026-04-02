@@ -3,27 +3,17 @@ import ContributorsTable from "../components/Tables/ContributorsTable";
 import ContributorModal from "../components/ContributorModal";
 import Loader from "../components/Loader";
 import EmptyState from "../components/EmptyState";
-import ErrorBanner from "../components/ErrorBanner";
-import MockDataNote from "../components/MockDataNote";
-import { useStats } from "../hooks/useStats";
-import { fetchContributors } from "../services/api";
 
-export default function Contributors({ repo }) {
-  const { data, loading, error, isMock, refetch } = useStats(fetchContributors, repo);
+export default function Contributors({ repo, stats }) {
+  const data = stats?.contributors ?? [];
+  const loading = false;
+  const error = null;
   const [selected, setSelected] = useState(null);
 
   if (loading) return <Loader />;
 
-  if (error && !data) return (
-    <>
-      <ErrorBanner message={error} onRetry={refetch} />
-      <EmptyState message="No data available" />
-    </>
-  );
-
   return (
     <div className="space-y-6">
-      {error && <ErrorBanner message={error} onRetry={refetch} />}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -43,7 +33,6 @@ export default function Contributors({ repo }) {
           onClose={() => setSelected(null)}
         />
       )}
-      {isMock && <MockDataNote />}
     </div>
   );
 }
