@@ -4,31 +4,17 @@ import StatCard from "../components/StatCard";
 import LineChartComponent from "../components/Charts/LineChartComponent";
 import BarChartComponent from "../components/Charts/BarChartComponent";
 import Loader from "../components/Loader";
-import EmptyState from "../components/EmptyState";
-import ErrorBanner from "../components/ErrorBanner";
-import MockDataNote from "../components/MockDataNote";
-import { useStats } from "../hooks/useStats";
-import {
-  fetchDailyStats,
-  fetchWeeklyStats,
-  fetchContributors,
-  fetchLanguages,
-} from "../services/api";
 
-export default function Overview({ repo }) {
-  const daily = useStats(fetchDailyStats, repo);
-  const weekly = useStats(fetchWeeklyStats, repo);
-  const contributors = useStats(fetchContributors, repo);
-  const languages = useStats(fetchLanguages, repo);
+export default function Overview({ repo, stats }) {
+  const daily = { data: stats?.daily ?? [], loading: false, error: null, isMock: false };
+  const weekly = { data: stats?.weekly ?? [], loading: false, error: null, isMock: false };
+  const contributors = { data: stats?.contributors ?? [], loading: false, error: null, isMock: false };
+  const languages = { data: stats?.languages ?? [], loading: false, error: null, isMock: false };
 
   const loading =
     daily.loading || weekly.loading || contributors.loading || languages.loading;
 
-  const anyError = daily.error || weekly.error || contributors.error || languages.error;
-  const anyRefetch = () => { daily.refetch(); weekly.refetch(); contributors.refetch(); languages.refetch(); };
-  const showMock = daily.isMock || weekly.isMock || contributors.isMock || languages.isMock;
-
-  const stats = useMemo(() => {
+  const derivedStats = useMemo(() => {
     if (!daily.data || !contributors.data || !languages.data) return null;
 
     const totalCommits = daily.data.reduce((s, d) => s + d.commits, 0);
@@ -54,44 +40,36 @@ export default function Overview({ repo }) {
 
   if (loading) return <Loader />;
 
-  if (anyError && !stats) return (
-    <>
-      <ErrorBanner message={anyError} onRetry={anyRefetch} />
-      <EmptyState message="No data available" />
-    </>
-  );
-
   return (
     <div className="space-y-6">
-      {anyError && <ErrorBanner message={anyError} onRetry={anyRefetch} />}
-      {stats && (
+      {derivedStats && (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
             title="Total Commits"
-            value={stats.totalCommits.toLocaleString()}
+            value={derivedStats.totalCommits.toLocaleString()}
             subtitle="Last 30 days"
             icon={GitCommit}
             color="primary"
           />
           <StatCard
             title="Active Contributors"
-            value={stats.activeContributors}
+            value={derivedStats.activeContributors}
             subtitle="All time"
             icon={Users}
             color="green"
           />
           <StatCard
             title="Top Contributor"
-            value={stats.topContributor}
+            value={derivedStats.topContributor}
             subtitle="By total commits"
             icon={Crown}
             color="amber"
           />
           <StatCard
             title="Languages Used"
-            value={stats.totalLanguages}
+            value={derivedStats.totalLanguages}
             subtitle={
-              stats.mostActiveToday ? (
+              derivedStats.mostActiveToday ? (
                 <span className="inline-flex items-center gap-1 text-amber-500">
                   <Flame size={12} /> Most active today
                 </span>
@@ -121,7 +99,6 @@ export default function Overview({ repo }) {
           color="#818cf8"
         />
       </div>
-      {showMock && <MockDataNote />}
     </div>
   );
 }
