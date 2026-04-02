@@ -193,6 +193,11 @@ export async function fetchRepos() {
   }
 }
 
+export async function fetchEphemeralStats(repo) {
+  const res = await client.get("/stats/ephemeral", { params: { repo } });
+  return res.data; // { daily, weekly, contributors, languages, leaderboard }
+}
+
 export async function loadRepo(repoFullName) {
   // Kick off background loading
   await client.post("/repo/load", { repo: repoFullName });

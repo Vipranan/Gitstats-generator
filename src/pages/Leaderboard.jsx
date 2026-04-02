@@ -3,12 +3,8 @@ import { motion } from "framer-motion";
 import { Trophy, Medal, Flame } from "lucide-react";
 import Loader from "../components/Loader";
 import EmptyState from "../components/EmptyState";
-import ErrorBanner from "../components/ErrorBanner";
-import MockDataNote from "../components/MockDataNote";
 import Pagination from "../components/Pagination";
-import { useStats } from "../hooks/useStats";
 import { usePagination } from "../hooks/usePagination";
-import { fetchLeaderboard } from "../services/api";
 
 const PERIODS = [
   { key: "daily", label: "Daily" },
@@ -42,23 +38,17 @@ function RankBadge({ rank }) {
   );
 }
 
-export default function Leaderboard({ repo }) {
+export default function Leaderboard({ repo, stats }) {
   const [period, setPeriod] = useState("weekly");
-  const { data, loading, error, isMock, refetch } = useStats(fetchLeaderboard, repo, period);
+  const data = stats?.leaderboard ?? [];
+  const loading = false;
+  const error = null;
   const { page, setPage, totalPages, paginatedData } = usePagination(data, 10);
 
   if (loading) return <Loader />;
 
-  if (error && !data) return (
-    <>
-      <ErrorBanner message={error} onRetry={refetch} />
-      <EmptyState message="No data available" />
-    </>
-  );
-
   return (
     <div className="space-y-6">
-      {error && <ErrorBanner message={error} onRetry={refetch} />}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Leaderboard</h2>
@@ -126,7 +116,6 @@ export default function Leaderboard({ repo }) {
         totalItems={data?.length ?? 0}
         pageSize={10}
       />
-      {isMock && <MockDataNote />}
     </div>
   );
 }

@@ -2,15 +2,13 @@ import { useMemo } from "react";
 import PieChartComponent from "../components/Charts/PieChartComponent";
 import Loader from "../components/Loader";
 import EmptyState from "../components/EmptyState";
-import ErrorBanner from "../components/ErrorBanner";
-import MockDataNote from "../components/MockDataNote";
 import Pagination from "../components/Pagination";
-import { useStats } from "../hooks/useStats";
 import { usePagination } from "../hooks/usePagination";
-import { fetchLanguages } from "../services/api";
 
-export default function Languages({ repo }) {
-  const { data, loading, error, isMock, refetch } = useStats(fetchLanguages, repo);
+export default function Languages({ repo, stats }) {
+  const data = stats?.languages ?? [];
+  const loading = false;
+  const error = null;
 
   const perContributor = useMemo(() => {
     if (!data) return [];
@@ -28,16 +26,8 @@ export default function Languages({ repo }) {
 
   if (loading) return <Loader />;
 
-  if (error && !data) return (
-    <>
-      <ErrorBanner message={error} onRetry={refetch} />
-      <EmptyState message="No data available" />
-    </>
-  );
-
   return (
     <div className="space-y-6">
-      {error && <ErrorBanner message={error} onRetry={refetch} />}
       <div>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
           Languages
@@ -110,7 +100,6 @@ export default function Languages({ repo }) {
           </div>
         </div>
       )}
-      {isMock && <MockDataNote />}
     </div>
   );
 }

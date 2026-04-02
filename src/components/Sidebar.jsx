@@ -6,12 +6,11 @@ import {
   Code2,
   Trophy,
   GitBranch,
-  ChevronDown,
   X,
   Plus,
   Loader2,
 } from "lucide-react";
-import { loadRepo } from "../services/api";
+import { fetchEphemeralStats } from "../services/api";
 
 const NAV = [
   { to: "/", label: "Overview", icon: LayoutDashboard },
@@ -22,7 +21,7 @@ const NAV = [
 
 const REPO_NAME_RE = /^[a-zA-Z0-9._-]{1,39}\/[a-zA-Z0-9._-]{1,100}$/;
 
-export default function Sidebar({ repos, repo, onRepoChange, onReposRefresh, open, onClose }) {
+export default function Sidebar({ repo, onStatsLoaded, open, onClose }) {
   const [adding, setAdding] = useState(false);
   const [newRepo, setNewRepo] = useState("");
   const [loading, setLoading] = useState(false);
@@ -38,13 +37,12 @@ export default function Sidebar({ repos, repo, onRepoChange, onReposRefresh, ope
     setLoading(true);
     setError("");
     try {
-      await loadRepo(value);
+      const stats = await fetchEphemeralStats(value);
       setNewRepo("");
       setAdding(false);
-      onReposRefresh();
-      onRepoChange(value);
+      onStatsLoaded(value, stats);
     } catch (err) {
-      setError(err.response?.data?.detail ?? "Failed to load repo");
+      setError(err.response?.data?.detail ?? err.message ?? "Failed to fetch repo stats");
     } finally {
       setLoading(false);
     }
@@ -91,11 +89,17 @@ export default function Sidebar({ repos, repo, onRepoChange, onReposRefresh, ope
             <button
               onClick={() => setAdding((a) => !a)}
               className="rounded p-0.5 text-gray-400 hover:text-primary-600 dark:hover:text-primary-400"
-              title="Add repository"
+              title="Look up repository"
             >
               <Plus size={14} />
             </button>
           </label>
+
+          {repo && !adding && (
+            <p className="truncate rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
+              {repo}
+            </p>
+          )}
 
           {adding && (
             <form onSubmit={handleAddRepo} className="mb-2">
@@ -114,7 +118,7 @@ export default function Sidebar({ repos, repo, onRepoChange, onReposRefresh, ope
                   className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 disabled:opacity-50"
                 >
                   {loading ? <Loader2 size={12} className="animate-spin" /> : null}
-                  {loading ? "Loading..." : "Add"}
+                  {loading ? "Fetching..." : "View Stats"}
                 </button>
                 <button
                   type="button"
@@ -130,27 +134,9 @@ export default function Sidebar({ repos, repo, onRepoChange, onReposRefresh, ope
             </form>
           )}
 
-          {repos.length > 0 ? (
-            <div className="relative">
-              <select
-                value={repo}
-                onChange={(e) => onRepoChange(e.target.value)}
-                className="w-full appearance-none rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 pr-8 text-sm font-medium text-gray-700 outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
-              >
-                {repos.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown
-                size={14}
-                className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400"
-              />
-            </div>
-          ) : (
+          {!repo && !adding && (
             <p className="text-xs text-gray-400 dark:text-gray-500">
-              No repos loaded yet. Click + to add one.
+              Click + to view any GitHub repo.
             </p>
           )}
         </div>
@@ -178,7 +164,7 @@ export default function Sidebar({ repos, repo, onRepoChange, onReposRefresh, ope
 
         <div className="border-t border-gray-200 px-5 py-4 dark:border-gray-800">
           <p className="text-xs text-gray-400 dark:text-gray-500">
-            Auto-refreshes every 60s
+            Stats fetched live from GitHub
           </p>
         </div>
       </aside>
