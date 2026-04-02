@@ -88,3 +88,65 @@ def fetch_repo_info(owner: str, repo: str) -> dict:
         raise ValueError(f"Repository {owner}/{repo} not found")
     resp.raise_for_status()
     return resp.json()
+
+
+def fetch_stats_contributors(owner: str, repo: str, max_retries: int = 5) -> list[dict]:
+    """
+    Fetch GitHub's pre-computed contributor stats (weekly commits/additions/deletions).
+    Returns 202 while GitHub is computing — retries up to max_retries times with 2s sleep.
+    Returns list of contributor stat objects.
+    """
+    url = f"{GITHUB_API}/repos/{owner}/{repo}/stats/contributors"
+    for attempt in range(max_retries):
+        resp = requests.get(url, headers=_headers(), timeout=30)
+        if resp.status_code == 202:
+            logger.info("GitHub computing contributor stats, retry %d/%d", attempt + 1, max_retries)
+            time.sleep(2)
+            continue
+        if resp.status_code == 404:
+            raise ValueError(f"Repository {owner}/{repo} not found")
+        resp.raise_for_status()
+        data = resp.json()
+        if data:
+            return data
+        time.sleep(2)
+    logger.warning("Contributor stats still empty after %d retries for %s/%s", max_retries, owner, repo)
+    return []
+
+
+def fetch_stats_commit_activity(owner: str, repo: str, max_retries: int = 5) -> list[dict]:
+    """
+    Fetch GitHub's weekly commit counts for the past 52 weeks.
+    Each item: {"days": [sun..sat counts], "total": N, "week": unix_timestamp}
+    Returns 202 while computing — retries with 2s sleep.
+    """
+    url = f"{GITHUB_API}/repos/{owner}/{repo}/stats/commit_activity"
+    for attempt in range(max_retries):
+        resp = requests.get(url, headers=_headers(), timeout=30)
+        if resp.status_code == 202:
+            logger.info("GitHub computing commit activity, retry %d/%d", attempt + 1, max_retries)
+            time.sleep(2)
+            continue
+        if resp.status_code == 404:
+            raise ValueError(f"Repository {owner}/{repo} not found")
+        resp.raise_for_status()
+        data = resp.json()
+        if data:
+            return data
+        time.sleep(2)
+    logger.warning("Commit activity empty after %d retries for %s/%s", max_retries, owner, repo)
+    return []
+
+
+def fetch_repo_languages(owner: str, repo: str) -> dict[str, int]:
+    """
+    Fetch byte counts per language for the repository.
+    Returns {"Python": 123456, "JavaScript": 78901, ...}
+    This endpoint returns instantly (not cached like stats endpoints).
+    """
+    url = f"{GITHUB_API}/repos/{owner}/{repo}/languages"
+    resp = requests.get(url, headers=_headers(), timeout=30)
+    if resp.status_code == 404:
+        raise ValueError(f"Repository {owner}/{repo} not found")
+    resp.raise_for_status()
+    return resp.json()
