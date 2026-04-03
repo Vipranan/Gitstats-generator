@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -77,7 +77,6 @@ def ephemeral_stats(
     Returns combined JSON: {daily, weekly, contributors, languages, leaderboard}.
     Repo data is NOT stored anywhere.
     """
-    from fastapi import HTTPException
     try:
         owner, name = repo.split("/", 1)
     except ValueError:

@@ -26,7 +26,7 @@ def _handle_rate_limit(response: requests.Response) -> None:
         time.sleep(sleep_for)
 
 
-def fetch_commits(owner: str, repo: str, since: str | None = None, per_page: int = 100) -> list[dict]:
+def fetch_commits(owner: str, repo: str, since: str | None = None, per_page: int = 100, max_pages: int | None = None) -> list[dict]:
     """
     Fetch all commits for a repo, handling pagination.
     `since` is an ISO-8601 date string for incremental fetches.
@@ -58,6 +58,9 @@ def fetch_commits(owner: str, repo: str, since: str | None = None, per_page: int
 
         all_commits.extend(commits)
         page += 1
+
+        if max_pages is not None and page > max_pages:
+            break
 
         # Respect rate limit proactively
         _handle_rate_limit(resp)

@@ -6,6 +6,7 @@ All data is computed in memory and returned immediately. Nothing is persisted.
 from __future__ import annotations
 
 import logging
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, timedelta, timezone
 
@@ -118,7 +119,7 @@ def _build_contributors(
             "linesAdded": lines_added,
             "linesDeleted": lines_deleted,
             "topLanguage": top_lang,
-            "languageBreakdown": lang_breakdown_template,
+            "languageBreakdown": [dict(entry) for entry in lang_breakdown_template],
             "weeklyActivity": weekly_activity,
             "streak": streak,
         })
@@ -177,20 +178,23 @@ def compute_ephemeral_stats(owner: str, repo: str) -> dict:
     since_30d = (date.today() - timedelta(days=30)).isoformat() + "T00:00:00Z"
 
     results: dict = {}
+    _lock = threading.Lock()
 
     def _fetch(key, fn, *args, **kwargs):
         try:
-            results[key] = fn(*args, **kwargs)
+            value = fn(*args, **kwargs)
         except Exception as exc:
             logger.warning("Failed to fetch %s: %s", key, exc)
-            results[key] = None
+            value = None
+        with _lock:
+            results[key] = value
 
     with ThreadPoolExecutor(max_workers=4) as pool:
         futures = [
-            pool.submit(_fetch, "contributors_raw", fetch_stats_contributors, owner, repo),
-            pool.submit(_fetch, "activity_raw",     fetch_stats_commit_activity, owner, repo),
+            pool.submit(_fetch, "contributors_raw", fetch_stats_contributors, owner, repo, 3),
+            pool.submit(_fetch, "activity_raw",     fetch_stats_commit_activity, owner, repo, 3),
             pool.submit(_fetch, "lang_bytes",        fetch_repo_languages, owner, repo),
-            pool.submit(_fetch, "commits_raw",       fetch_commits, owner, repo, since_30d),
+            pool.submit(_fetch, "commits_raw",       fetch_commits, owner, repo, since_30d, 100, 1),
         ]
         for f in as_completed(futures):
             f.result()
