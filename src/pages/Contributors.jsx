@@ -1,16 +1,11 @@
 import { useState } from "react";
 import ContributorsTable from "../components/Tables/ContributorsTable";
 import ContributorModal from "../components/ContributorModal";
-import Loader from "../components/Loader";
 import EmptyState from "../components/EmptyState";
 
-export default function Contributors({ repo, stats }) {
+export default function Contributors({ stats }) {
   const data = stats?.contributors ?? [];
-  const loading = false;
-  const error = null;
   const [selected, setSelected] = useState(null);
-
-  if (loading) return <Loader />;
 
   return (
     <div className="space-y-6">

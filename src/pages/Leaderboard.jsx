@@ -1,16 +1,8 @@
-import { useState } from "react";
 import { motion } from "framer-motion";
 import { Trophy, Medal, Flame } from "lucide-react";
-import Loader from "../components/Loader";
 import EmptyState from "../components/EmptyState";
 import Pagination from "../components/Pagination";
 import { usePagination } from "../hooks/usePagination";
-
-const PERIODS = [
-  { key: "daily", label: "Daily" },
-  { key: "weekly", label: "Weekly" },
-  { key: "monthly", label: "Monthly" },
-];
 
 function RankBadge({ rank }) {
   if (rank === 1)
@@ -38,37 +30,15 @@ function RankBadge({ rank }) {
   );
 }
 
-export default function Leaderboard({ repo, stats }) {
-  const [period, setPeriod] = useState("weekly");
+export default function Leaderboard({ stats }) {
   const data = stats?.leaderboard ?? [];
-  const loading = false;
-  const error = null;
   const { page, setPage, totalPages, paginatedData } = usePagination(data, 10);
-
-  if (loading) return <Loader />;
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Leaderboard</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Top contributors ranked by contribution score</p>
-        </div>
-        <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 dark:border-gray-700 dark:bg-gray-800">
-          {PERIODS.map((p) => (
-            <button
-              key={p.key}
-              onClick={() => setPeriod(p.key)}
-              className={`rounded-md px-3.5 py-1.5 text-xs font-medium transition-colors ${
-                period === p.key
-                  ? "bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-white"
-                  : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Leaderboard</h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400">Top contributors ranked by contribution score</p>
       </div>
 
       {!data?.length ? (

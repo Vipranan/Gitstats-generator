@@ -3,30 +3,26 @@ import { GitCommit, Users, Crown, Code2, Flame } from "lucide-react";
 import StatCard from "../components/StatCard";
 import LineChartComponent from "../components/Charts/LineChartComponent";
 import BarChartComponent from "../components/Charts/BarChartComponent";
-import Loader from "../components/Loader";
 
 export default function Overview({ repo, stats }) {
-  const daily = { data: stats?.daily ?? [], loading: false, error: null, isMock: false };
-  const weekly = { data: stats?.weekly ?? [], loading: false, error: null, isMock: false };
-  const contributors = { data: stats?.contributors ?? [], loading: false, error: null, isMock: false };
-  const languages = { data: stats?.languages ?? [], loading: false, error: null, isMock: false };
-
-  const loading =
-    daily.loading || weekly.loading || contributors.loading || languages.loading;
+  const daily = stats?.daily ?? [];
+  const weekly = stats?.weekly ?? [];
+  const contributors = stats?.contributors ?? [];
+  const languages = stats?.languages ?? [];
 
   const derivedStats = useMemo(() => {
-    if (!daily.data || !contributors.data || !languages.data) return null;
+    if (!daily || !contributors || !languages) return null;
 
-    const totalCommits = daily.data.reduce((s, d) => s + d.commits, 0);
-    const activeContributors = contributors.data.length;
-    const topContrib = [...contributors.data].sort(
+    const totalCommits = daily.reduce((s, d) => s + d.commits, 0);
+    const activeContributors = contributors.length;
+    const topContrib = [...contributors].sort(
       (a, b) => b.totalCommits - a.totalCommits
     )[0];
-    const totalLangs = languages.data.length;
+    const totalLangs = languages.length;
 
     const today = new Date().toISOString().split("T")[0];
     const todayCommits =
-      daily.data.find((d) => d.date === today)?.commits ?? 0;
+      daily.find((d) => d.date === today)?.commits ?? 0;
     const mostActiveToday = todayCommits > 0;
 
     return {
@@ -36,9 +32,7 @@ export default function Overview({ repo, stats }) {
       totalLanguages: totalLangs,
       mostActiveToday,
     };
-  }, [daily.data, contributors.data, languages.data]);
-
-  if (loading) return <Loader />;
+  }, [daily, contributors, languages]);
 
   return (
     <div className="space-y-6">
@@ -85,14 +79,14 @@ export default function Overview({ repo, stats }) {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <LineChartComponent
-          data={daily.data}
+          data={daily}
           xKey="date"
           yKey="commits"
           title="Daily Commits"
           color="#6366f1"
         />
         <BarChartComponent
-          data={weekly.data}
+          data={weekly}
           xKey="week"
           yKey="commits"
           title="Weekly Commits"

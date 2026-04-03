@@ -1,14 +1,11 @@
 import { useMemo } from "react";
 import PieChartComponent from "../components/Charts/PieChartComponent";
-import Loader from "../components/Loader";
 import EmptyState from "../components/EmptyState";
 import Pagination from "../components/Pagination";
 import { usePagination } from "../hooks/usePagination";
 
-export default function Languages({ repo, stats }) {
+export default function Languages({ stats }) {
   const data = stats?.languages ?? [];
-  const loading = false;
-  const error = null;
 
   const perContributor = useMemo(() => {
     if (!data) return [];
@@ -23,8 +20,6 @@ export default function Languages({ repo, stats }) {
   }, [data]);
 
   const { page, setPage, totalPages, paginatedData: pagedContributors } = usePagination(perContributor, 10);
-
-  if (loading) return <Loader />;
 
   return (
     <div className="space-y-6">
